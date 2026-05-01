@@ -10,6 +10,39 @@ const el = (tag, className, text) => {
 const slugify = (value) =>
   String(value).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 
+const historyStartYear = (item) => {
+  const match = String(item.year).match(/\d+/);
+  return match ? Number(match[0]) : 0;
+};
+
+const historyEraGroups = [
+  { range: "0-161 SE", start: 0, end: 161 },
+  { range: "323-466 SE", start: 323, end: 466 },
+  { range: "544-722 SE", start: 544, end: 722 },
+  { range: "833-900 SE", start: 833, end: 900 },
+  { range: "920-1224 SE", start: 920, end: 1224 }
+];
+
+const groupHistoryEntries = (entries) =>
+  historyEraGroups
+    .map((era) => ({
+      ...era,
+      entries: entries.filter((item) => {
+        const year = historyStartYear(item);
+        return year >= era.start && year <= era.end;
+      })
+    }))
+    .filter((era) => era.entries.length);
+
+const openHistoryEntryAfterScroll = (id) => {
+  window.setTimeout(() => {
+    const target = document.getElementById(id);
+    if (!target) return;
+    const details = target.querySelector(".history-source");
+    if (details) details.open = true;
+  }, 520);
+};
+
 const factRow = (label, value) => {
   const row = el("div", "fact-row");
   row.appendChild(el("span", null, label));
@@ -34,13 +67,28 @@ const historyDetails = (item) => {
 function renderHistorySkim(entries = data.history) {
   const list = $("#historyJumpList");
   list.innerHTML = "";
-  entries.forEach((item) => {
-    const id = `history-${slugify(`${item.year}-${item.title}`)}`;
-    const link = el("a", "history-jump");
-    link.href = `#${id}`;
-    link.appendChild(el("span", null, item.year));
-    link.appendChild(el("strong", null, item.title));
-    list.appendChild(link);
+  const eras = groupHistoryEntries(entries);
+  eras.forEach((era) => {
+    const group = el("section", "history-era");
+    const marker = el("div", "history-era-marker");
+    marker.appendChild(el("span", null, era.range));
+    marker.appendChild(el("small", null, `${era.entries.length} ${era.entries.length === 1 ? "entry" : "entries"}`));
+    group.appendChild(marker);
+
+    const events = el("ol", "history-era-events");
+    era.entries.forEach((item) => {
+      const id = `history-${slugify(`${item.year}-${item.title}`)}`;
+      const event = el("li", "history-era-event");
+      const link = el("a", null);
+      link.href = `#${id}`;
+      link.addEventListener("click", () => openHistoryEntryAfterScroll(id));
+      link.appendChild(el("span", null, item.year));
+      link.appendChild(el("strong", null, item.title));
+      event.appendChild(link);
+      events.appendChild(event);
+    });
+    group.appendChild(events);
+    list.appendChild(group);
   });
 }
 
