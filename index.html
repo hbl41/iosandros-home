@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Iosandros</title>
+    <meta name="description" content="Campaign home for the Realm of Iosandros: history, map, kingdoms, prophecies, calendar, and world reference.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Crimson+Pro:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./styles.css">
+    <script src="./world-data.js" defer></script>
+    <script src="./site.js" defer></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="#home" aria-label="Iosandros home">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span>Iosandros</span>
+      </a>
+      <form class="site-search" role="search" autocomplete="off">
+        <label for="siteSearch">Search</label>
+        <input id="siteSearch" type="search" placeholder="Search history, kingdoms, prophecies...">
+        <div class="site-search-results" id="siteSearchResults" role="listbox" aria-label="Search results"></div>
+      </form>
+      <nav aria-label="World sections">
+        <a href="#history">History</a>
+        <a href="#map">Map</a>
+        <a href="#kingdoms">World</a>
+        <a href="#prophecies">Prophecies</a>
+      </nav>
+    </header>
+
+    <main id="home">
+      <section class="hero">
+        <img src="https://raw.githubusercontent.com/hbl41/Iosandros-App/main/assets/map.jpg" alt="Map of the Realm of Iosandros">
+        <div class="hero-copy">
+          <p class="eyebrow">The Realm</p>
+          <h1>Iosandros</h1>
+          <p>
+            A campaign reference for the Realm of Iosandros: the larger historical events,
+            the 13 Kingdoms and Territories, the map, the calendar, and
+            Eternium's seven prophecies.
+          </p>
+          <div class="hero-actions">
+            <a class="button primary" href="#history">Explore History</a>
+            <a class="button ghost" href="#map">Open Map</a>
+          </div>
+        </div>
+      </section>
+
+      <section class="overview" aria-label="Quick world overview">
+        <article>
+          <span>Year</span>
+          <strong>1224 SE</strong>
+          <p>The Beginning of Campaign 1.</p>
+        </article>
+        <article>
+          <span>Realm</span>
+          <strong>13 Kingdoms</strong>
+          <p>Including their Great House connections.</p>
+        </article>
+        <article>
+          <span>Calendar</span>
+          <strong>13 Months</strong>
+          <p>13 month solar cycle - 365 days.</p>
+        </article>
+        <article>
+          <span>Doctrine</span>
+          <strong>Eternium</strong>
+          <p>A Throne, Passed Down for Generations.</p>
+        </article>
+      </section>
+
+      <section class="section-heading" id="history">
+        <p class="eyebrow">Since the Separation</p>
+        <h2>Historical Index</h2>
+        <p>A general historical timeline covering the larger historical events of the Realm of Iosandros.</p>
+        <input id="historySearch" class="search" type="search" placeholder="Search history...">
+      </section>
+      <section class="history-skim" aria-label="Skim historical entries">
+        <div class="history-skim-head">
+          <span>Skim by year and event</span>
+          <button id="historyExpandAll" type="button">Expand all</button>
+        </div>
+        <div class="history-jump-list" id="historyJumpList"></div>
+      </section>
+      <section class="timeline" id="timeline" aria-live="polite"></section>
+
+      <section class="section-heading" id="map">
+        <p class="eyebrow">Cartography</p>
+        <h2>Map of the Realm</h2>
+        <p>A visual anchor for orientation, travel, and political geography.</p>
+      </section>
+      <figure class="map-panel">
+        <img src="https://raw.githubusercontent.com/hbl41/Iosandros-App/main/assets/map.jpg" alt="Map of the Realm of Iosandros">
+      </figure>
+
+      <section class="section-heading" id="kingdoms">
+        <p class="eyebrow">The Realm</p>
+        <h2>The 13 Kingdoms and The Territories</h2>
+        <p>A comprehensive list of each of the 13 Kingdoms, including their connections to The Great Houses of Iosandros.</p>
+      </section>
+      <div class="scan-note">
+        <span>Sovereign Kingdoms</span>
+        <p>Each entry keeps the source text intact. Key facts stay visible; longer descriptions expand in place.</p>
+      </div>
+      <section class="card-grid" id="kingdomGrid"></section>
+      <div class="scan-note territory-note">
+        <span>The Territories</span>
+      </div>
+      <section class="card-grid compact" id="territoryGrid"></section>
+
+      <section class="split-section" id="prophecies">
+        <div>
+          <p class="eyebrow">Eternium</p>
+          <h2>The Seven Prophecies</h2>
+          <p id="prophecyDoctrine"></p>
+        </div>
+        <div class="prophecy-list" id="prophecyList"></div>
+      </section>
+
+      <section class="split-section" id="calendar">
+        <div>
+          <p class="eyebrow">World Reference</p>
+          <h2>Calendar</h2>
+          <p>The Iosandran calendar.</p>
+        </div>
+        <div class="reference-columns single">
+          <div>
+            <h3>Calendar</h3>
+            <div class="month-list" id="calendarList"></div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
