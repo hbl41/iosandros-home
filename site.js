@@ -34,13 +34,67 @@ const groupHistoryEntries = (entries) =>
     }))
     .filter((era) => era.entries.length);
 
-const openHistoryEntryAfterScroll = (id) => {
-  window.setTimeout(() => {
-    const target = document.getElementById(id);
-    if (!target) return;
-    const details = target.querySelector(".history-source");
-    if (details) details.open = true;
-  }, 520);
+let mapScrollY = 0;
+let mapReturnFocus = null;
+let moveTopFrame = null;
+let searchIndex = null;
+const FAST_SCROLL_DURATION = 260;
+
+const prefersReducedMotion = () =>
+  window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+const easeOutCubic = (value) => 1 - Math.pow(1 - value, 3);
+
+const scrollMarginTop = (target) => {
+  const value = window.getComputedStyle(target).scrollMarginTop;
+  return Number.parseFloat(value) || 0;
+};
+
+const targetScrollY = (target, block = "start") => {
+  const rect = target.getBoundingClientRect();
+  if (block === "center") {
+    return Math.max(0, window.scrollY + rect.top - ((window.innerHeight - rect.height) / 2));
+  }
+
+  return Math.max(0, window.scrollY + rect.top - scrollMarginTop(target));
+};
+
+function scrollToY(targetY, duration = FAST_SCROLL_DURATION) {
+  const startY = window.scrollY;
+  const distance = targetY - startY;
+
+  if (prefersReducedMotion() || Math.abs(distance) < 2) {
+    window.scrollTo(0, targetY);
+    queueMoveTopUpdate();
+    return Promise.resolve();
+  }
+
+  const startTime = performance.now();
+  return new Promise((resolve) => {
+    const step = (now) => {
+      const progress = Math.min((now - startTime) / duration, 1);
+      window.scrollTo(0, startY + (distance * easeOutCubic(progress)));
+      if (progress < 1) {
+        window.requestAnimationFrame(step);
+      } else {
+        queueMoveTopUpdate();
+        resolve();
+      }
+    };
+
+    window.requestAnimationFrame(step);
+  });
+}
+
+function fastScrollToTarget(target, { block = "start", updateHash = true } = {}) {
+  if (!target) return Promise.resolve();
+  if (updateHash && target.id) history.pushState(null, "", `#${target.id}`);
+  return scrollToY(targetScrollY(target, block));
+}
+
+function openHistoryEntry(target) {
+  const details = target?.querySelector(".history-source");
+  if (details) details.open = true;
 };
 
 const factRow = (label, value) => {
@@ -52,17 +106,22 @@ const factRow = (label, value) => {
 
 const sourceDetails = (text) => {
   const details = el("details", "source-entry");
-  details.appendChild(el("summary", null, "Full source entry"));
+  details.appendChild(el("summary", null, "Open notes"));
   details.appendChild(el("p", null, text));
   return details;
 };
 
 const historyDetails = (item) => {
   const details = el("details", "history-source");
-  details.appendChild(el("summary", null, "Read source text"));
+  details.appendChild(el("summary", null, "Open record"));
   (item.body || []).forEach((paragraph) => details.appendChild(el("p", null, paragraph)));
   return details;
 };
+
+function getSearchIndex() {
+  if (!searchIndex) searchIndex = buildSearchIndex();
+  return searchIndex;
+}
 
 function renderHistorySkim(entries = data.history) {
   const list = $("#historyJumpList");
@@ -70,9 +129,10 @@ function renderHistorySkim(entries = data.history) {
   const eras = groupHistoryEntries(entries);
   eras.forEach((era) => {
     const group = el("section", "history-era");
+    group.setAttribute("aria-label", `${era.range}, ${era.entries.length} ${era.entries.length === 1 ? "record" : "records"}`);
     const marker = el("div", "history-era-marker");
     marker.appendChild(el("span", null, era.range));
-    marker.appendChild(el("small", null, `${era.entries.length} ${era.entries.length === 1 ? "entry" : "entries"}`));
+    marker.appendChild(el("small", null, `${era.entries.length} ${era.entries.length === 1 ? "record" : "records"}`));
     group.appendChild(marker);
 
     const events = el("ol", "history-era-events");
@@ -81,7 +141,6 @@ function renderHistorySkim(entries = data.history) {
       const event = el("li", "history-era-event");
       const link = el("a", null);
       link.href = `#${id}`;
-      link.addEventListener("click", () => openHistoryEntryAfterScroll(id));
       link.appendChild(el("span", null, item.year));
       link.appendChild(el("strong", null, item.title));
       event.appendChild(link);
@@ -104,7 +163,8 @@ function renderHistory(query = "") {
 
   if (!entries.length) {
     renderHistorySkim([]);
-    timeline.appendChild(el("p", "empty", "No matching history entries."));
+    timeline.appendChild(el("p", "empty", "No history matches."));
+    queueMoveTopUpdate();
     return;
   }
 
@@ -119,6 +179,48 @@ function renderHistory(query = "") {
     article.appendChild(body);
     timeline.appendChild(article);
   });
+  queueMoveTopUpdate();
+}
+
+function clearInlineSearchResults() {
+  const results = $("#historySearchResults");
+  if (!results) return;
+  results.classList.remove("open");
+  results.innerHTML = "";
+}
+
+function renderInlineSearchResults(query = "") {
+  const results = $("#historySearchResults");
+  if (!results) return;
+  const q = query.trim().toLowerCase();
+  results.innerHTML = "";
+  if (q.length < 2) {
+    clearInlineSearchResults();
+    return;
+  }
+
+  const hits = getSearchIndex()
+    .filter((item) => item.text.toLowerCase().includes(q))
+    .slice(0, 8);
+
+  if (!hits.length) {
+    results.appendChild(el("p", "inline-search-empty", "No world references match."));
+  } else {
+    hits.forEach((hit) => {
+      const button = el("button", "inline-search-result");
+      button.type = "button";
+      button.addEventListener("click", () => {
+        jumpToSearchHit(hit);
+        clearInlineSearchResults();
+      });
+      button.appendChild(el("span", "result-kind", hit.kind));
+      button.appendChild(el("strong", null, hit.title));
+      if (hit.label) button.appendChild(el("small", null, hit.label));
+      results.appendChild(button);
+    });
+  }
+
+  results.classList.add("open");
 }
 
 function renderRegions() {
@@ -184,9 +286,9 @@ function renderReference() {
 
 function buildSearchIndex() {
   const sectionResults = [
-    ["Section", "History", "A general historical timeline covering the larger historical events of the Realm of Iosandros.", "history"],
+    ["Section", "Timeline", "From the Separation to the opening of Campaign 1.", "history"],
     ["Section", "Map", "Map of the Realm.", "map"],
-    ["Section", "The 13 Kingdoms and The Territories", "A comprehensive list of each of the 13 Kingdoms.", "kingdoms"],
+    ["Section", "Kingdoms and Territories", "Ruling houses, capitals, populations, and regional notes.", "kingdoms"],
     ["Section", "The Seven Prophecies", data.prophecies.doctrine, "prophecies"],
     ["Section", "Calendar", data.calendarIntro, "calendar"]
   ].map(([kind, title, text, id]) => ({ kind, title, text, id }));
@@ -236,10 +338,55 @@ function buildSearchIndex() {
   return [...sectionResults, ...historyResults, ...kingdomResults, ...territoryResults, ...prophecyResults, ...calendarResults];
 }
 
+function jumpToSearchHit(hit) {
+  closeExpandedMap({ restoreFocus: false });
+
+  if (hit.resetHistory) {
+    $("#historySearch").value = "";
+    renderHistory();
+    clearInlineSearchResults();
+  }
+
+  requestAnimationFrame(() => {
+    const target = document.getElementById(hit.id);
+    if (!target) return;
+    if (hit.openSource) {
+      const details = target.querySelector("details");
+      if (details) details.open = true;
+    }
+    if (hit.resetHistory) {
+      const details = target.querySelector(".history-source");
+      if (details) details.open = true;
+    }
+    fastScrollToTarget(target, { block: "center", updateHash: false }).then(() => {
+      target.classList.add("search-focus");
+      setTimeout(() => target.classList.remove("search-focus"), 1800);
+    });
+  });
+}
+
+function setupFastAnchorScroll() {
+  document.addEventListener("click", (event) => {
+    const link = event.target.closest('a[href^="#"]');
+    if (!link) return;
+
+    const hash = link.getAttribute("href");
+    if (!hash || hash === "#") return;
+
+    const target = document.getElementById(hash.slice(1));
+    if (!target) return;
+
+    event.preventDefault();
+    closeExpandedMap({ restoreFocus: false });
+    fastScrollToTarget(target).then(() => {
+      if (target.classList.contains("event")) openHistoryEntry(target);
+    });
+  });
+}
+
 function setupGlobalSearch() {
   const input = $("#siteSearch");
   const results = $("#siteSearchResults");
-  const index = buildSearchIndex();
 
   const closeResults = () => {
     results.classList.remove("open");
@@ -247,27 +394,7 @@ function setupGlobalSearch() {
   };
 
   const jumpTo = (hit) => {
-    if (hit.resetHistory) {
-      $("#historySearch").value = "";
-      renderHistory();
-    }
-
-    requestAnimationFrame(() => {
-      const target = document.getElementById(hit.id);
-      if (!target) return;
-      if (hit.openSource) {
-        const details = target.querySelector("details");
-        if (details) details.open = true;
-      }
-      if (hit.resetHistory) {
-        const details = target.querySelector(".history-source");
-        if (details) details.open = true;
-      }
-      target.scrollIntoView({ behavior: "smooth", block: "center" });
-      target.classList.add("search-focus");
-      setTimeout(() => target.classList.remove("search-focus"), 1800);
-    });
-
+    jumpToSearchHit(hit);
     input.value = "";
     closeResults();
   };
@@ -280,7 +407,7 @@ function setupGlobalSearch() {
       return;
     }
 
-    const hits = index
+    const hits = getSearchIndex()
       .filter((item) => item.text.toLowerCase().includes(query))
       .slice(0, 9);
 
@@ -313,7 +440,96 @@ function setupGlobalSearch() {
   });
 }
 
-$("#historySearch").addEventListener("input", (event) => renderHistory(event.target.value));
+function openExpandedMap(trigger = document.activeElement) {
+  const toggle = $("#mapToggle");
+  const stage = $("#expandedMapStage");
+  const closeButton = $("#mapClose");
+  if (!toggle || !stage || document.body.classList.contains("map-open")) return;
+
+  mapScrollY = window.scrollY;
+  mapReturnFocus = trigger instanceof HTMLElement ? trigger : toggle;
+  document.body.classList.add("map-open");
+  toggle.setAttribute("aria-expanded", "true");
+  stage.setAttribute("aria-hidden", "false");
+  queueMoveTopUpdate();
+  requestAnimationFrame(() => closeButton?.focus({ preventScroll: true }));
+}
+
+function closeExpandedMap({ restoreFocus = true } = {}) {
+  const toggle = $("#mapToggle");
+  const stage = $("#expandedMapStage");
+  if (!toggle || !stage || !document.body.classList.contains("map-open")) return;
+
+  document.body.classList.remove("map-open");
+  toggle.setAttribute("aria-expanded", "false");
+  stage.setAttribute("aria-hidden", "true");
+  window.scrollTo(0, mapScrollY);
+  if (restoreFocus) (mapReturnFocus || toggle).focus({ preventScroll: true });
+  mapReturnFocus = null;
+  queueMoveTopUpdate();
+}
+
+function setupExpandedMap() {
+  const toggle = $("#mapToggle");
+  const heroButton = $("#heroMapButton");
+  const closeButton = $("#mapClose");
+
+  toggle?.addEventListener("click", () => openExpandedMap(toggle));
+  heroButton?.addEventListener("click", () => openExpandedMap(heroButton));
+  closeButton?.addEventListener("click", () => closeExpandedMap());
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") closeExpandedMap();
+  });
+}
+
+function shouldShowMoveTopButton() {
+  const skim = $(".history-skim");
+  if (!skim || document.body.classList.contains("map-open")) return false;
+  const skimBottom = skim.getBoundingClientRect().bottom + window.scrollY;
+  return window.scrollY > skimBottom;
+}
+
+function updateMoveTopButton() {
+  const button = $("#moveTopButton");
+  if (!button) return;
+  const isVisible = shouldShowMoveTopButton();
+  button.classList.toggle("visible", isVisible);
+  button.setAttribute("aria-hidden", String(!isVisible));
+  button.tabIndex = isVisible ? 0 : -1;
+}
+
+function queueMoveTopUpdate() {
+  if (moveTopFrame) return;
+  moveTopFrame = window.requestAnimationFrame(() => {
+    moveTopFrame = null;
+    updateMoveTopButton();
+  });
+}
+
+function setupMoveTopButton() {
+  const button = $("#moveTopButton");
+  if (!button) return;
+  button.addEventListener("click", () => {
+    closeExpandedMap({ restoreFocus: false });
+    history.pushState(null, "", "#home");
+    scrollToY(0);
+  });
+  window.addEventListener("scroll", queueMoveTopUpdate, { passive: true });
+  window.addEventListener("resize", queueMoveTopUpdate);
+  updateMoveTopButton();
+}
+
+$("#historySearch").addEventListener("input", (event) => {
+  renderHistory(event.target.value);
+  renderInlineSearchResults(event.target.value);
+});
+$("#historySearch").addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    event.target.value = "";
+    renderHistory();
+    clearInlineSearchResults();
+  }
+});
 $("#historyExpandAll").addEventListener("click", (event) => {
   const details = Array.from(document.querySelectorAll(".history-source"));
   const shouldOpen = details.some((node) => !node.open);
@@ -325,3 +541,6 @@ renderRegions();
 renderProphecies();
 renderReference();
 setupGlobalSearch();
+setupExpandedMap();
+setupFastAnchorScroll();
+setupMoveTopButton();

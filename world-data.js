@@ -375,7 +375,7 @@ window.IOSANDROS = {
     },
     {
       year: "1224 SE",
-      title: "The Beginning of Campaign 1",
+      title: "Campaign 1 Begins",
       body: [
         `Following the death of his wife, Trask Brolin allows the Kingdom to enter an era of 'hands-off' rule, largely allowing the Kingdoms of Iosandros to rule and govern themselves, sometimes to a fault.`,
         `However, the paranoia of the King very seldom allows the Blood Knights to travel beyond the borders of Lorenthar for more than a month or two at a time. Trask fears for himself, his bloodline, and Eternium. Events in Iosandros, however, drive him to a new place. He's getting old, and he knows it. It's time for his son to see, and learn about, the world he is one day going to have to rule...`
@@ -527,7 +527,7 @@ window.IOSANDROS = {
     ]
   },
 
-  calendarIntro: "13 month solar cycle - 365 days",
+  calendarIntro: "13 months, 365 days",
   calendar: [
     ["Primar", "30 days", ""],
     ["Ferdax", "28 days", "Harvest Season begins"],
